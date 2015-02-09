@@ -18,6 +18,10 @@
         height: 100%;
     }
 
+    canvas {
+      display: none;
+    }
+
     .docs-overview h3,
     .docs-getting-started h4 {
       border-left: 1px solid #69f;
@@ -100,13 +104,16 @@
       </div>
     </div>
   </div>
-
+  <canvas id="the-canvas" style="display: none;"></canvas>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.2/js/bootstrap.min.js"></script>
   <script src="dist/cropper.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.1.2/backbone-min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.marionette/2.2.2/backbone.marionette.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.marionette/2.2.2/backbone.marionette.min.js"></script>
+  <script src="dist/q.js"></script>
+  <script src="dist/pdf.js"></script>
   <script type="text/template" id="thumbnail-tmpl">
     <div class="col-xs-6 col-md-3">
       <a href="#" class="thumbnail"><img src="<%=src%>" alt="..."></a>
@@ -138,6 +145,44 @@
       }
     });
 
+    var extractPage = function (page) {
+
+      var scale = 1;
+      var viewport = page.getViewport(scale);
+
+      //
+      // Prepare canvas using PDF page dimensions
+      //
+      var canvas = document.createElement("canvas");
+      var context = canvas.getContext("2d");
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      //
+      // Render PDF page into canvas context
+      //
+      var renderContext = {
+        canvasContext: context,
+        viewport: viewport
+      };
+
+      return page.render(renderContext).then(function () {
+        return canvas.toDataURL();
+      });
+    };
+
+    var extractPages = function (pages) {
+      return Q.all(_.map(pages, extractPage));
+    };
+
+    var getPages = function (pdf) {
+      var deferreds = [], numPages = pdf.numPages, i = 1;
+      for (;i<=numPages;i++) {
+        deferreds.push(pdf.getPage(i));
+      }
+      return Q.all(deferreds);
+    };
+
     var InputView = Backbone.View.extend({
       initialize: function (options) {
         this.collection = options.collection;
@@ -147,6 +192,17 @@
       },
       onImgLoad: function (collection) {
         collection.add([{src: this.result, preview: ""}]);
+      },
+      onPdfLoad: function (collection) {
+        var pdfPromise = PDFJS.getDocument(this.result);
+        var pagesPromise = pdfPromise.then(getPages);
+        var extractPagesPromise = pagesPromise.then(extractPages);
+
+        extractPagesPromise.then(function (pages) {
+          _.each(pages, function (dataURL) {
+            collection.add([{src: dataURL, preview: ""}]);
+          });
+        });
       },
       onChange: function () {
         var fileReader,
@@ -165,6 +221,10 @@
             fileReader = new FileReader();
             fileReader.readAsDataURL(file);
             fileReader.onload = _.bind(this.onImgLoad, fileReader, this.collection);
+          } else if (file.type === "application/pdf") {
+            fileReader = new FileReader();
+            fileReader.readAsDataURL(file);
+            fileReader.onload = _.bind(this.onPdfLoad, fileReader, this.collection);
           } else {
             alert("Please choose an image or pdf file.");
           }
