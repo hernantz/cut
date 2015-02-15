@@ -84,11 +84,6 @@
                 <span class="glyphicon glyphicon-upload"></span> Upload
               </span>
             </label>
-            <button class="btn btn-primary" id="download" type="button" title="Download cropped image">
-              <span class="docs-tooltip" data-toggle="tooltip" title="Export image with &quot;getDataURL&quot;">
-                <span class="glyphicon glyphicon-scissors"></span> Cut
-              </span>
-            </button>
           </div>
         </div>
         <div class="row">
@@ -104,7 +99,6 @@
       </div>
     </div>
   </div>
-  <canvas id="the-canvas" style="display: none;"></canvas>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.2/js/bootstrap.min.js"></script>
   <script src="dist/cropper.min.js"></script>
@@ -261,7 +255,7 @@
               width: 640,
               height: 360
             },
-            done: function(data) { }
+            dragend: function(data) { Backbone.trigger("preview-img"); }
         };
       },
       generatePreview: function () {
@@ -315,9 +309,6 @@
         el: $(".thumbnails")
       });
 
-      $("#download").click(function() {
-          Backbone.trigger("preview-img");
-      });
       window.app = app;
     });
   </script>
